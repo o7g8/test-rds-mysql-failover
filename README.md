@@ -132,6 +132,44 @@ dotnet build
 
 Create an EC2 and allow it to connect to the RDS in the RDS security group.
 
+## Create RDS Aurora/MySQL database
+
+* RDS > Create Database
+
+* Standard Create
+
+* Engine type: Amazon Aurora
+
+* Edition: Amazon Aurora MySQL-Compatible Edition
+
+* Engine Version: Aurora (MySQL 5.7) (pick the latest one)
+
+* Templates: Production
+
+* DB cluster identifier: `<choose your own>`
+
+* Master username: `admin` (or `<choose your own>`)
+
+* Master Password: `<choose your own>`
+
+* DB instance class: Standard classes, `db.t3.small` (or `<choose your own>`)
+
+* Multi-AZ deployment: Don't create an Aurora Replica
+
+* Don't connect to an EC2 compute resource.
+
+* VPC: `<choose your own>`
+
+* Public access: No
+
+* VPC security group: Create new. NB! You will need to edit the security group associated with the RDS instance to allow traffic from your EC2 instance running the "downtime detection" tool.
+
+* Create an RDS Proxy: Yes
+
+* Database authentication: Password authentication
+
+Create an EC2 and allow it to connect to the RDS in the RDS security group.
+
 ## References
 
 * When to use RDS Proxy <https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/rds-proxy-planning.html>
