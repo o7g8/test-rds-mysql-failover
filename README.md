@@ -12,21 +12,13 @@ Usage:
 dotnet tool -- -e <db-endpoint> -u <username> -p <password> -d <database> -l <label>
 ```
 
-To assess the DB availability via different endpoints run the tool against RDS endpoint, Always-ON listener endpoint, and RDS Proxy endpoint in separate terminal windows:
+To assess the DB availability via different endpoints run the tool against RDS endpoint, and RDS Proxy endpoint in separate terminal windows:
 
 * via **RDS endpoint**:
 
 ```bash
 dotnet tool -- -e <rds-endpoint> -u <username> -p <password> -l RDS
 ```
-
-* via **Always-ON listener endpoint**:
-
-```bash
-dotnet tool -- -e <alwayson-listener-endpoint> -u <username> -p <password> -l AlwaysON
-```
-
-NOTE: first time it took 5-7 connection retires till the tool was able to connect to the Always-ON listener in my case. Thereafter the tool connected to the endpoint instantaneously.
 
 * via **RDS Proxy endpoint**:
 
@@ -43,134 +35,48 @@ Then modify the RDS database, e.g. resize the instance:
 E.g. run:
 
 ```bash
-./rds-resize.sh database-1 db.m6i.xlarge
+./rds-resize.sh database-1 db.t3.large
 ```
 
 Keep watching the tool output to detect the downtime.
 
-I resized my instance from `db.m6i.large` to `db.m6i.xlarge` (the operation took ~25 min) and got following results regarding the DB downtime:
+I resized my instance from `db.t3.small` to `db.t3.large` (started 9:41-9:51 - the operation took ~10 min) and got following results regarding the DB downtime:
 
-* RDS endpoint: downtime 3 sec;
-
-* Always-ON Listener endpoint: no downtime;
-
-* RDS Proxy endpoint: no downtime.
-
-NOTE: according to <https://learn.microsoft.com/en-us/sql/database-engine/availability-groups/windows/listeners-client-connectivity-application-failover?view=sql-server-ver16>
+* RDS endpoint: downtime 9:49:33 - 9:50:38 = 65 sec
 
 ```text
-During a failover, when the primary replica changes, existing connections to the listener are disconnected and new connections are routed to the new primary replica.
+12/6/2022 9:49:33 AM : RDS Starting a query...
+12/6/2022 9:49:33 AM : RDS ERROR: Server shutdown in progress, retry #1
+12/6/2022 9:49:34 AM : RDS Opening a DB connection to xxxxx
+12/6/2022 9:49:34 AM : RDS ERROR: Unable to connect to any of the specified MySQL hosts., retry #2
+...
+12/6/2022 9:50:37 AM : RDS ERROR: Connect Timeout expired., retry #35
+12/6/2022 9:50:38 AM : RDS Opening a DB connection to xxxxx
+12/6/2022 9:50:38 AM : RDS Starting a query...
+utf8mb4 utf8mb4_0900_ai_ci
+utf8 utf8_general_ci
+utf8mb4 utf8mb4_0900_ai_ci
+utf8mb4 utf8mb4_0900_ai_ci
+...
 ```
 
-Therefore it's surprising we didn't get the downtime with Always On and the existing DB connection continued to work.  
+Note that the client made 35 reconnection attempts during the DB downtime.
 
-## Example results
-
-Started the resize (scale-up) at 12:12, the resize took ~25min. The down time hit between 12:36:04 - 12:36:07.
-
-* RDS endpoint:
-
-Downtime b/w 12:36:05-12:36:08 = 3sec
+* RDS Proxy endpoint: 9:50:06 - 9:50:39 = 33 sec:
 
 ```text
-12/2/2022 12:36:04 AM : RDS Starting a query...
-master SQL_Latin1_General_CP1_CI_AS
-tempdb SQL_Latin1_General_CP1_CI_AS
-model SQL_Latin1_General_CP1_CI_AS
-msdb SQL_Latin1_General_CP1_CI_AS
-rdsadmin SQL_Latin1_General_CP1_CI_AS
-12/2/2022 12:36:05 AM : RDS Starting a query...
-12/2/2022 12:36:05 AM : RDS ERROR: SHUTDOWN is in progress., retry #1
-12/2/2022 12:36:06 AM : RDS Opening a DB connection to xxxxx
-12/2/2022 12:36:06 AM : RDS Starting a query...
-12/2/2022 12:36:06 AM : RDS ERROR: SHUTDOWN is in progress.
-Login failed for user 'admin'.
-Cannot continue the execution because the session is in the kill state.
-A severe error occurred on the current command.  The results, if any, should be discarded., retry #2
-12/2/2022 12:36:07 AM : RDS Opening a DB connection to xxxxxx
-12/2/2022 12:36:08 AM : RDS Starting a query...
-master SQL_Latin1_General_CP1_CI_AS
-tempdb SQL_Latin1_General_CP1_CI_AS
-model SQL_Latin1_General_CP1_CI_AS
-msdb SQL_Latin1_General_CP1_CI_AS
-rdsadmin SQL_Latin1_General_CP1_CI_AS
+12/6/2022 9:49:33 AM : PROXY Starting a query...
+12/6/2022 9:50:06 AM : PROXY ERROR: The Command Timeout expired before the operation completed., retry #1
+12/6/2022 9:50:07 AM : PROXY Opening a DB connection to proxy-1670316268233-database-1.proxy-ckgfwrbmhiis.us-east-1.rds.amazonaws.com
+12/6/2022 9:50:39 AM : PROXY Starting a query...
+utf8mb4 utf8mb4_0900_ai_ci
+utf8 utf8_general_ci
+utf8mb4 utf8mb4_0900_ai_ci
+utf8mb4 utf8mb4_0900_ai_ci
 ```
 
-* Always On Listener Endpoint:
+Note that it was only single reconnect attempt, which took 32 sec.  
 
-WARNING: The first time the client was able to connect to the DB after 5-8 attempts.
-
-No downtime between 12:36:04 - 12:36:08 and in the rest of logs.
-
-```text
-12/2/2022 12:36:04 AM : AG Starting a query...
-master SQL_Latin1_General_CP1_CI_AS
-tempdb SQL_Latin1_General_CP1_CI_AS
-model SQL_Latin1_General_CP1_CI_AS
-msdb SQL_Latin1_General_CP1_CI_AS
-rdsadmin SQL_Latin1_General_CP1_CI_AS
-12/2/2022 12:36:05 AM : AG Starting a query...
-master SQL_Latin1_General_CP1_CI_AS
-tempdb SQL_Latin1_General_CP1_CI_AS
-model SQL_Latin1_General_CP1_CI_AS
-msdb SQL_Latin1_General_CP1_CI_AS
-rdsadmin SQL_Latin1_General_CP1_CI_AS
-12/2/2022 12:36:06 AM : AG Starting a query...
-master SQL_Latin1_General_CP1_CI_AS
-tempdb SQL_Latin1_General_CP1_CI_AS
-model SQL_Latin1_General_CP1_CI_AS
-msdb SQL_Latin1_General_CP1_CI_AS
-rdsadmin SQL_Latin1_General_CP1_CI_AS
-12/2/2022 12:36:07 AM : AG Starting a query...
-master SQL_Latin1_General_CP1_CI_AS
-tempdb SQL_Latin1_General_CP1_CI_AS
-model SQL_Latin1_General_CP1_CI_AS
-msdb SQL_Latin1_General_CP1_CI_AS
-rdsadmin SQL_Latin1_General_CP1_CI_AS
-12/2/2022 12:36:08 AM : AG Starting a query...
-master SQL_Latin1_General_CP1_CI_AS
-tempdb SQL_Latin1_General_CP1_CI_AS
-model SQL_Latin1_General_CP1_CI_AS
-msdb SQL_Latin1_General_CP1_CI_AS
-rdsadmin SQL_Latin1_General_CP1_CI_AS
-```
-
-* RDS Proxy:
-
-No downtime between 12:36:04 - 12:36:08 and in the rest of logs.
-
-```text
-12/2/2022 12:36:04 AM : PROXY Starting a query...
-master SQL_Latin1_General_CP1_CI_AS
-tempdb SQL_Latin1_General_CP1_CI_AS
-model SQL_Latin1_General_CP1_CI_AS
-msdb SQL_Latin1_General_CP1_CI_AS
-rdsadmin SQL_Latin1_General_CP1_CI_AS
-12/2/2022 12:36:05 AM : PROXY Starting a query...
-master SQL_Latin1_General_CP1_CI_AS
-tempdb SQL_Latin1_General_CP1_CI_AS
-model SQL_Latin1_General_CP1_CI_AS
-msdb SQL_Latin1_General_CP1_CI_AS
-rdsadmin SQL_Latin1_General_CP1_CI_AS
-12/2/2022 12:36:06 AM : PROXY Starting a query...
-master SQL_Latin1_General_CP1_CI_AS
-tempdb SQL_Latin1_General_CP1_CI_AS
-model SQL_Latin1_General_CP1_CI_AS
-msdb SQL_Latin1_General_CP1_CI_AS
-rdsadmin SQL_Latin1_General_CP1_CI_AS
-12/2/2022 12:36:07 AM : PROXY Starting a query...
-master SQL_Latin1_General_CP1_CI_AS
-tempdb SQL_Latin1_General_CP1_CI_AS
-model SQL_Latin1_General_CP1_CI_AS
-msdb SQL_Latin1_General_CP1_CI_AS
-rdsadmin SQL_Latin1_General_CP1_CI_AS
-12/2/2022 12:36:08 AM : PROXY Starting a query...
-master SQL_Latin1_General_CP1_CI_AS
-tempdb SQL_Latin1_General_CP1_CI_AS
-model SQL_Latin1_General_CP1_CI_AS
-msdb SQL_Latin1_General_CP1_CI_AS
-rdsadmin SQL_Latin1_General_CP1_CI_AS
-```
 
 ## Build
 
@@ -228,15 +134,9 @@ Create an EC2 and allow it to connect to the RDS in the RDS security group.
 
 ## References
 
-* Amazon RDS Proxy for MS SQL Server <https://aws.amazon.com/about-aws/whats-new/2022/09/amazon-rds-proxy-rds-sql-server/>
-
 * When to use RDS Proxy <https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/rds-proxy-planning.html>
 
 * Using Amazon RDS Proxy <https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/rds-proxy.html>
-
-* MS SQL Always ON <https://learn.microsoft.com/en-us/sql/database-engine/availability-groups/windows/overview-of-always-on-availability-groups-sql-server?view=sql-server-ver16>
-
-* Always ON listener <https://learn.microsoft.com/en-us/sql/database-engine/availability-groups/windows/listeners-client-connectivity-application-failover?view=sql-server-ver16>
 
 Some pieces of the code are borrowed from the following sources:
 
@@ -246,8 +146,6 @@ Some pieces of the code are borrowed from the following sources:
 
 ## TODO
 
-Create similar tests for: PgSQL, and MySQL:
+Create similar tests for: PgSQL:
 
 * <https://zetcode.com/csharp/postgresql/> PgSQL. Collation queries <https://dba.stackexchange.com/questions/29943/how-to-determine-the-collation-of-a-table-in-postgresql>
-
-* <https://mysqlconnector.net/tutorials/connect-to-mysql/> MySQL. Collation queries <https://database.guide/how-to-show-database-collation-mysql/>
