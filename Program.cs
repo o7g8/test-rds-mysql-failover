@@ -4,7 +4,7 @@ using MySqlConnector;
 var endpoint = "";
 var user = "admin";
 var password = "";
-var database = "";
+var database = "mysql";
 var label = "";
 
 Parser.Default.ParseArguments<CommandLineOptions>(args)
@@ -73,7 +73,7 @@ public class CommandLineOptions
     [Option('p', "password", Required = true, HelpText = "DB password")]
     public string? Password { get; set; }
 
-    [Option('d', "database", Required = true, HelpText = "Database")]
+    [Option('d', "database", Required = false, Default = "mysql", HelpText = "Database")]
     public string? Database { get; set; }
 
     [Option('l', "label", Required = false, Default = "", HelpText = "Free-text label which will be used as prefix in stdout messages")]
