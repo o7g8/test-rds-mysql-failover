@@ -77,6 +77,127 @@ utf8mb4 utf8mb4_0900_ai_ci
 
 Note that it was only single reconnect attempt, which took 32 sec.  
 
+## Aurora/MySQL
+
+### Resize writer instance
+
+```bash
+./rds-resize.sh database-2-instance-1 db.t3.medium
+```
+
+NOTE: the resized writer will become a new reader and the previous reader will be promoted to be a writer.
+
+* Writer endpoint - downtime 1:30:19-1:30:27 (8 sec)
+
+```text
+12/6/2022 1:30:19 PM : WRITER Starting a query...
+12/6/2022 1:30:19 PM : WRITER ERROR: Failed to read the result set., retry #1
+12/6/2022 1:30:20 PM : WRITER Opening a DB connection to database-2.cluster-ckgfwrbmhiis.us-east-1.rds.amazonaws.com
+...
+12/6/2022 1:30:26 PM : WRITER ERROR: Unable to connect to any of the specified MySQL hosts., retry #8
+12/6/2022 1:30:27 PM : WRITER Opening a DB connection to xxxxx
+12/6/2022 1:30:27 PM : WRITER Starting a query...
+utf8 utf8_general_ci
+latin1 latin1_swedish_ci
+utf8 utf8_general_ci
+utf8 utf8_general_ci
+...
+```
+
+* Reader endpoint - downtime 1:30:19-1:30:27 (8 sec)
+
+```text
+12/6/2022 1:30:19 PM : READER Starting a query...
+12/6/2022 1:30:19 PM : READER ERROR: Failed to read the result set., retry #1
+12/6/2022 1:30:20 PM : READER Opening a DB connection to xxxxx
+...
+12/6/2022 1:30:26 PM : READER ERROR: Unable to connect to any of the specified MySQL hosts., retry #8
+12/6/2022 1:30:27 PM : READER Opening a DB connection to xxxxx
+12/6/2022 1:30:27 PM : READER Starting a query...
+utf8 utf8_general_ci
+latin1 latin1_swedish_ci
+utf8 utf8_general_ci
+utf8 utf8_general_ci
+```
+
+* Proxy writer endpoint: no downtime!
+
+```text
+...
+12/6/2022 1:30:19 PM : PROXY_WRITER Starting a query...
+utf8 utf8_general_ci
+latin1 latin1_swedish_ci
+utf8 utf8_general_ci
+utf8 utf8_general_ci
+12/6/2022 1:30:20 PM : PROXY_WRITER Starting a query...
+utf8 utf8_general_ci
+latin1 latin1_swedish_ci
+utf8 utf8_general_ci
+utf8 utf8_general_ci
+...
+```
+
+* Proxy reader endpoint: downtime 2:09:46-2:13:09 (3min 23 sec)
+
+```text
+...
+12/6/2022 2:09:46 PM : PROXY_READER Starting a query...
+12/6/2022 2:10:18 PM : PROXY_READER ERROR: The Command Timeout expired before the operation completed., retry #1
+12/6/2022 2:10:19 PM : PROXY_READER Opening a DB connection to xxxxx
+12/6/2022 2:12:19 PM : PROXY_READER ERROR: Connect Timeout expired., retry #2
+12/6/2022 2:12:20 PM : PROXY_READER Opening a DB connection to xxxxx
+12/6/2022 2:13:09 PM : PROXY_READER Starting a query...
+utf8 utf8_general_ci
+latin1 latin1_swedish_ci
+utf8 utf8_general_ci
+utf8 utf8_general_ci
+...
+```
+
+NOTE: very strange to get the downtime from the reader endpoint!!! Need to try to create a cluster with a dedicated reader endpoint.
+
+### Resize reader instance
+
+We resize the new reader:
+
+```bash
+./rds-resize.sh database-2-instance-1 db.t3.small
+```
+
+* Writer endpoint: no downtime
+
+* Reader endpoint: downtime 1:50:27-1:50:28 (1 sec)
+
+```text
+12/6/2022 1:50:27 PM : READER Starting a query...
+12/6/2022 1:50:27 PM : READER ERROR: Failed to read the result set., retry #1
+12/6/2022 1:50:28 PM : READER Opening a DB connection to database-2.cluster-ro-ckgfwrbmhiis.us-east-1.rds.amazonaws.com
+12/6/2022 1:50:28 PM : READER Starting a query...
+utf8 utf8_general_ci
+latin1 latin1_swedish_ci
+utf8 utf8_general_ci
+utf8 utf8_general_ci
+```
+
+* Proxy writer endpoint: no downtime
+
+* Proxy reader endpoint: downtime 1:50:27-1:54:50 (4min 23 sec!!!)
+
+```text
+...
+12/6/2022 1:50:27 PM : PROXY_READER Starting a query...
+12/6/2022 1:50:59 PM : PROXY_READER ERROR: The Command Timeout expired before the operation completed., retry #1
+12/6/2022 1:51:00 PM : PROXY_READER Opening a DB connection to proxy-1670332417056-database-2-read-only.endpoint.proxy-ckgfwrbmhiis.us-east-1.rds.amazonaws.com
+12/6/2022 1:53:00 PM : PROXY_READER ERROR: Connect Timeout expired., retry #2
+12/6/2022 1:53:01 PM : PROXY_READER Opening a DB connection to proxy-1670332417056-database-2-read-only.endpoint.proxy-ckgfwrbmhiis.us-east-1.rds.amazonaws.com
+12/6/2022 1:54:50 PM : PROXY_READER Starting a query...
+utf8 utf8_general_ci
+latin1 latin1_swedish_ci
+utf8 utf8_general_ci
+utf8 utf8_general_ci
+```
+
+NOTE: very strange to get the extremely long downtime from the reader endpoint!!! Need to try to create a cluster with a dedicated reader endpoint.
 
 ## Build
 
