@@ -199,6 +199,13 @@ utf8 utf8_general_ci
 
 NOTE: very strange to get the extremely long downtime from the reader endpoint!!! Need to try to create a cluster with a dedicated reader endpoint.
 
+## Conclusions
+
+With the default Aurora production setup you also get 2 nodes for HA (similarly to RDS Multi-AZ), but unlike with Multi-AZ you can use the 2nd node for read-only operations.
+If  you can refactor your software to split DB reads from writes (make them access different DB endpoints), then you can scale DB “write” and “read” instances independently. And unlike with RDS Multi-AZ the Writer and Reader instances in Aurora can have different sizes.
+
+Overall the failover times with Aurora are a lot better compared to RDS MySQL (though I need to investigate why RDS Proxy ReadOnly endpoint has the anomaly long timeouts).
+
 ## Build
 
 Install .NET Core 6 (or better) following a guide for your OS, e.g. <https://learn.microsoft.com/en-us/dotnet/core/install/linux-ubuntu>
